@@ -7,10 +7,17 @@ import { GetResponseDataTypeFromEndpointMethod } from '@octokit/types';
 const REACTIONS = ['+1', '-1', 'laugh', 'confused', 'heart', 'hooray', 'rocket', 'eyes'] as const;
 type Reaction = (typeof REACTIONS)[number];
 
+const COMMENT_MAX_LENGTH = 64000; // max is 65536, but we keep a padding just in case :)
+
+const CUT_DELIMITER = '<!-- cut-delimiter -->';
+const WARNING_MESSAGE_LENGTH_TOO_LONG = '\n\n<b>Warning:</b> Output length greater than max comment size. Continued in next comment.';
+
 async function run() {
   try {
     const message: string = core.getInput('message');
     const filePath: string = core.getInput('filePath');
+    const cutDelimiter: string = core.getInput('cutDelimiter') || CUT_DELIMITER;
+    const cutMessage: string = core.getInput('cutMessage') || WARNING_MESSAGE_LENGTH_TOO_LONG;
     const github_token: string = core.getInput('GITHUB_TOKEN');
     const pr_number: string = core.getInput('pr_number');
     const comment_tag: string = core.getInput('comment_tag');
@@ -66,20 +73,44 @@ async function run() {
       issue_number: number;
       body: string;
     }) {
-      const { data: comment } = await octokit.rest.issues.createComment({
-        owner,
-        repo,
-        issue_number,
-        body,
-      });
+      const chunks = [];
+      let message = body;
 
-      core.setOutput('id', comment.id);
-      core.setOutput('body', comment.body);
-      core.setOutput('html_url', comment.html_url);
+      while (message.length > COMMENT_MAX_LENGTH) {
+        const chunk = message.substring(0, COMMENT_MAX_LENGTH);
+        const lastIndexOfCutDelimiter = chunk.lastIndexOf(cutDelimiter);
 
-      await addReactions(comment.id, reactions);
+        if (lastIndexOfCutDelimiter !== -1) {
+          chunks.push(chunk.substring(0, lastIndexOfCutDelimiter + cutDelimiter.length));
+          message = message.substring(lastIndexOfCutDelimiter + cutDelimiter.length);
+        } else {
+          // No cut delimiter found in this chunk, so just truncate
+          chunks.push(chunk);
+          message = message.substring(COMMENT_MAX_LENGTH);
+        }
+      }
 
-      return comment;
+      // Add the remaining message as the last chunk
+      chunks.push(message);
+
+      let firstComment
+      for (const [index, chunk] of chunks.entries()) {
+        const { data: comment } = await octokit.rest.issues.createComment({
+          owner,
+          repo,
+          issue_number,
+          body: index == chunks.length -1 ? chunk : `${chunk}${cutMessage}`,
+        });
+        if (!firstComment) {
+          firstComment = comment
+          core.setOutput('id', firstComment.id);
+          core.setOutput('body', firstComment.body);
+          core.setOutput('html_url', firstComment.html_url);
+          await addReactions(firstComment.id, reactions);
+        }
+      }
+
+      return firstComment;
     }
 
     async function updateComment({

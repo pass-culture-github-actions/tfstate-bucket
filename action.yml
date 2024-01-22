@@ -24,6 +24,14 @@ inputs:
   create_if_not_exists:
     description: 'Whether a comment should be created even if comment_tag is not found.'
     default: 'true'
+  cutDelimiter:
+    description: 'If comment length is greater than 65536 (max is 65536), it will create multiple comments splitting on delimiter close to limit'
+    required: false
+    default: '<!-- cut-delimiter -->'
+  cutMessage:
+    description: 'If set, otheride the default splitting message when a message is cut'
+    required: false
+    default: '<b>Warning:</b> Output length greater than max comment size. Continued in next comment.'
 runs:
   using: 'node16'
   main: 'lib/index.js'
