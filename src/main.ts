@@ -1,214 +1,43 @@
-import fs from 'fs';
 import * as github from '@actions/github';
 import * as core from '@actions/core';
 import { GetResponseDataTypeFromEndpointMethod } from '@octokit/types';
 
-// See https://docs.github.com/en/rest/reactions#reaction-types
-const REACTIONS = ['+1', '-1', 'laugh', 'confused', 'heart', 'hooray', 'rocket', 'eyes'] as const;
-type Reaction = (typeof REACTIONS)[number];
+import { readFileSync } from 'fs'
+import { resolve } from 'path'
 
-const COMMENT_MAX_LENGTH = 64000; // max is 65536, but we keep a padding just in case :)
-
-const CUT_DELIMITER = '<!-- cut-delimiter -->';
-const WARNING_MESSAGE_LENGTH_TOO_LONG = '\n\n<b>Warning:</b> Output length greater than max comment size. Continued in next comment.';
 
 async function run() {
   try {
-    const message: string = core.getInput('message');
-    const filePath: string = core.getInput('filePath');
-    const cutDelimiter: string = core.getInput('cutDelimiter') || CUT_DELIMITER;
-    const cutMessage: string = core.getInput('cutMessage') || WARNING_MESSAGE_LENGTH_TOO_LONG;
-    const github_token: string = core.getInput('GITHUB_TOKEN');
-    const pr_number: string = core.getInput('pr_number');
-    const comment_tag: string = core.getInput('comment_tag');
-    const reactions: string = core.getInput('reactions');
-    const mode: string = core.getInput('mode');
-    const create_if_not_exists: boolean = core.getInput('create_if_not_exists') === 'true';
+    const allModifiedFiles = core.getInput('all_modified_files').split(' ');
 
-    if (!message && !filePath) {
-      core.setFailed('Either "filePath" or "message" should be provided as input');
-      return;
-    }
+    async function createApps() {
+      const map = new Map()
+      const apps = []
+      const { execa } = await import('execa')
 
-    let content: string = message;
-    if (!message && filePath) {
-      content = fs.readFileSync(filePath, 'utf8');
-    }
+      const { stdout, stderr } = await execa('argocd', ['app', 'list', '--core', '--output', 'json']);
+      if (stderr) {
+        throw new Error(stderr)
+      }
+      const json = JSON.parse(stdout) // key = path, value = name
+      for (const app of json) {
+        const appName = app.metadata.name
+        const appPath = app.spec.source.path
+        map.set(appPath, map.has(appPath) ? [...map.get(appPath), appName] : [appName])
+      }
 
-    const context = github.context;
-    const issue_number = parseInt(pr_number) || context.payload.pull_request?.number || context.payload.issue?.number;
-
-    const octokit = github.getOctokit(github_token);
-
-    if (!issue_number) {
-      core.setFailed('No issue/pull request in input neither in current context.');
-      return;
-    }
-
-    async function addReactions(comment_id: number, reactions: string) {
-      const validReactions = <Reaction[]>reactions
-        .replace(/\s/g, '')
-        .split(',')
-        .filter((reaction) => REACTIONS.includes(<Reaction>reaction));
-
-      await Promise.allSettled(
-        validReactions.map(async (content) => {
-          await octokit.rest.reactions.createForIssueComment({
-            ...context.repo,
-            comment_id,
-            content,
-          });
-        }),
-      );
-    }
-
-    async function createComment({
-      owner,
-      repo,
-      issue_number,
-      body,
-    }: {
-      owner: string;
-      repo: string;
-      issue_number: number;
-      body: string;
-    }) {
-      const chunks = [];
-      let message = body;
-
-      while (message.length > COMMENT_MAX_LENGTH) {
-        const chunk = message.substring(0, COMMENT_MAX_LENGTH);
-        const lastIndexOfCutDelimiter = chunk.lastIndexOf(cutDelimiter);
-
-        if (lastIndexOfCutDelimiter !== -1) {
-          chunks.push(chunk.substring(0, lastIndexOfCutDelimiter + cutDelimiter.length));
-          message = message.substring(lastIndexOfCutDelimiter + cutDelimiter.length);
-        } else {
-          // No cut delimiter found in this chunk, so just truncate
-          chunks.push(chunk);
-          message = message.substring(COMMENT_MAX_LENGTH);
+      for (const allModifiedFile of allModifiedFiles) {
+        for (const [key, value] of map) {
+          if (`./${allModifiedFile}`.includes(key)) {
+            apps.push(value.find((v: string) => allModifiedFile.includes(v)))
+          }
         }
       }
 
-      // Add the remaining message as the last chunk
-      chunks.push(message);
-
-      let firstComment
-      for (const [index, chunk] of chunks.entries()) {
-        const { data: comment } = await octokit.rest.issues.createComment({
-          owner,
-          repo,
-          issue_number,
-          body: index == chunks.length -1 ? chunk : `${chunk}${cutMessage}`,
-        });
-        if (!firstComment) {
-          firstComment = comment
-          core.setOutput('id', firstComment.id);
-          core.setOutput('body', firstComment.body);
-          core.setOutput('html_url', firstComment.html_url);
-          await addReactions(firstComment.id, reactions);
-        }
-      }
-
-      return firstComment;
+      core.setOutput('apps', apps.join(' '));
     }
 
-    async function updateComment({
-      owner,
-      repo,
-      comment_id,
-      body,
-    }: {
-      owner: string;
-      repo: string;
-      comment_id: number;
-      body: string;
-    }) {
-      const { data: comment } = await octokit.rest.issues.updateComment({
-        owner,
-        repo,
-        comment_id,
-        body,
-      });
-
-      core.setOutput('id', comment.id);
-      core.setOutput('body', comment.body);
-      core.setOutput('html_url', comment.html_url);
-
-      await addReactions(comment.id, reactions);
-
-      return comment;
-    }
-
-    async function deleteComment({ owner, repo, comment_id }: { owner: string; repo: string; comment_id: number }) {
-      const { data: comment } = await octokit.rest.issues.deleteComment({
-        owner,
-        repo,
-        comment_id,
-      });
-
-      return comment;
-    }
-
-    const comment_tag_pattern = comment_tag
-      ? `<!-- thollander/actions-comment-pull-request "${comment_tag}" -->`
-      : null;
-    const body = comment_tag_pattern ? `${content}\n${comment_tag_pattern}` : content;
-
-    if (comment_tag_pattern) {
-      type ListCommentsResponseDataType = GetResponseDataTypeFromEndpointMethod<
-        typeof octokit.rest.issues.listComments
-      >;
-      let comment: ListCommentsResponseDataType[0] | undefined;
-      for await (const { data: comments } of octokit.paginate.iterator(octokit.rest.issues.listComments, {
-        ...context.repo,
-        issue_number,
-      })) {
-        comment = comments.find((comment) => comment?.body?.includes(comment_tag_pattern));
-        if (comment) break;
-      }
-
-      if (comment) {
-        if (mode === 'upsert') {
-          await updateComment({
-            ...context.repo,
-            comment_id: comment.id,
-            body,
-          });
-          return;
-        } else if (mode === 'recreate') {
-          await deleteComment({
-            ...context.repo,
-            comment_id: comment.id,
-          });
-
-          await createComment({
-            ...context.repo,
-            issue_number,
-            body,
-          });
-          return;
-        } else if (mode === 'delete') {
-          core.debug('Registering this comment to be deleted.');
-        } else {
-          core.setFailed(`Mode ${mode} is unknown. Please use 'upsert', 'recreate' or 'delete'.`);
-          return;
-        }
-      } else if (create_if_not_exists) {
-        core.info('No comment has been found with asked pattern. Creating a new comment.');
-      } else {
-        core.info(
-          'Not creating comment as the pattern has not been found. Use `create_if_not_exists: true` to create a new comment anyway.',
-        );
-        return;
-      }
-    }
-
-    await createComment({
-      ...context.repo,
-      issue_number,
-      body,
-    });
+    await createApps();
   } catch (error) {
     if (error instanceof Error) {
       core.setFailed(error.message);

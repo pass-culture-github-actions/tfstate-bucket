@@ -1,37 +1,36 @@
 {
-  "name": "comment-pull-request",
-  "version": "2.4.3",
-  "description": "GitHub action for commenting pull-request",
+  "name": "changed-argocd-app",
+  "version": "1.0.0",
+  "description": "GitHub action to retrieve argocd app edited in a PR",
   "main": "lib/main.js",
   "scripts": {
-    "build": "npm run build:main && npm run build:cleanup",
+    "build": "npm run build:main",
     "build:main": "ncc build src/main.ts -o lib",
-    "build:cleanup": "ncc build src/cleanup.ts -o lib/cleanup",
     "lint": "prettier --write **/*.ts"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/pass-culture-github-actions/comment-pull-request"
+    "url": "git+https://github.com/pass-culture-github-actions/changed-argocd-app"
   },
   "keywords": [
     "actions",
-    "container",
+    "argocd",
     "pull-request",
-    "comment",
-    "message"
+    "apps"
   ],
   "author": "Dimitri Kopriwa <dimitri.kopriwa@passculture.app>",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/pass-culture-github-actions/comment-pull-request/issues"
+    "url": "https://github.com/pass-culture-github-actions/changed-argocd-app/issues"
   },
-  "homepage": "https://github.com/pass-culture-github-actions/comment-pull-request#readme",
+  "homepage": "https://github.com/pass-culture-github-actions/changed-argocd-app#readme",
   "dependencies": {
     "@actions/core": "^1.10.1",
     "@actions/exec": "^1.0.0",
     "@actions/github": "^5.0.3",
     "@actions/io": "^1.1.3",
-    "@actions/tool-cache": "^2.0.1"
+    "@actions/tool-cache": "^2.0.1",
+    "execa": "^8.0.1"
   },
   "devDependencies": {
     "@tsconfig/node16": "^16.1.1",

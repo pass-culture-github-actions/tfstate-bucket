@@ -1,38 +1,12 @@
-name: 'Comment Pull Request'
-branding:
-  icon: 'message-circle'
-  color: 'blue'
-description: 'Comments a pull request with the provided message'
+name: 'Argocd apps edited in PR'
+description: 'GitHub action to retrieve argocd app edited in a PR'
 inputs:
-  message:
-    description: 'Message that should be printed in the pull request'
-  filePath:
-    description: 'Path of the file that should be commented'
-  GITHUB_TOKEN:
-    description: 'Github token of the repository (automatically created by Github)'
-    default: ${{ github.token }}
-    required: false
-  reactions:
-    description: 'You can set some reactions on your comments through the `reactions` input.'
-  pr_number:
-    description: 'Manual pull request number'
-  comment_tag:
-    description: 'A tag on your comment that will be used to identify a comment in case of replacement.'
-  mode:
-    description: 'Mode that will be used to update comment (upsert/recreate)'
-    default: 'upsert'
-  create_if_not_exists:
-    description: 'Whether a comment should be created even if comment_tag is not found.'
-    default: 'true'
-  cutDelimiter:
-    description: 'If comment length is greater than 65536 (max is 65536), it will create multiple comments splitting on delimiter close to limit'
-    required: false
-    default: '<!-- cut-delimiter -->'
-  cutMessage:
-    description: 'If set, otheride the default splitting message when a message is cut'
-    required: false
-    default: '<b>Warning:</b> Output length greater than max comment size. Continued in next comment.'
+  all_modified_files:
+    description: 'From tj-actions/changed-files: Returns all changed files i.e. a combination of all added, copied, modified and renamed files (ACMR)'
+    required: true
+outputs:
+  apps:
+    description: 'The list of ArgoCD app with changes'
 runs:
   using: 'node16'
   main: 'lib/index.js'
-  post: 'lib/cleanup/index.js'
