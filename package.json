@@ -1,7 +1,7 @@
 {
-  "name": "changed-argocd-app",
+  "name": "tfstate-bucket",
   "version": "1.0.0",
-  "description": "GitHub action to retrieve argocd app edited in a PR",
+  "description": "GitHub action to make change in the tfstate GCP bucket",
   "main": "lib/main.js",
   "scripts": {
     "build": "npm run build:main",
@@ -10,20 +10,20 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/pass-culture-github-actions/changed-argocd-app"
+    "url": "git+https://github.com/pass-culture-github-actions/tfstate-bucket"
   },
   "keywords": [
     "actions",
-    "argocd",
-    "pull-request",
-    "apps"
+    "tfstate",
+    "bucket",
+    "tfstate-bucket"
   ],
   "author": "Dimitri Kopriwa <dimitri.kopriwa@passculture.app>",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/pass-culture-github-actions/changed-argocd-app/issues"
+    "url": "https://github.com/pass-culture-github-actions/tfstate-bucket/issues"
   },
-  "homepage": "https://github.com/pass-culture-github-actions/changed-argocd-app#readme",
+  "homepage": "https://github.com/pass-culture-github-actions/tfstate-bucket#readme",
   "dependencies": {
     "@actions/core": "^1.10.1",
     "@actions/exec": "^1.0.0",

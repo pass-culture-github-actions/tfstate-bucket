@@ -1,12 +1,40 @@
-name: 'Argocd apps edited in PR'
-description: 'GitHub action to retrieve argocd app edited in a PR'
+name: 'tfstate GCP bucket'
+description: 'GitHub action to make change in the tfstate GCP bucket'
 inputs:
-  all_modified_files:
-    description: 'From tj-actions/changed-files: Returns all changed files i.e. a combination of all added, copied, modified and renamed files (ACMR)'
+  bucket:
+    description: 'The name of the bucket to pull'
     required: true
+  project:
+    description: 'The project name that own the bucket'
+    required: true
+  terragrunt-cache:
+    description: 'If set to true, it will locally remove empty .terragrunt-cache directory'
+    default: true
+  tfstate:
+    description: 'If set to true, it will locally remove empty tfstate files'
+    default: true
+  push:
+    description: 'If set to true, it will push changes to bucket'
+    default: false
+  terragrunt-directory:
+    description: 'Set the terragrunt directory from the checkout repository to start the filepath with to compare. Used when checkout-warning-mismatch: true'
+    default: ''
+  terragrunt-bucket-directory:
+    description: 'Set the terragrunt bucket directory to start the filepath with to compare. Used when checkout-warning-mismatch: true'
+    default: ''
 outputs:
-  apps:
-    description: 'The list of ArgoCD app with changes'
+  empty-tfstate-filepaths:
+    description: 'The file paths list of empty default.tfstate files'
+  empty-tfstate-filepaths-count:
+    description: 'The file paths count of empty default.tfstate files'
+  terragrunt-cache-filepaths:
+    description: 'The file paths list of .terragrunt-cache directories'
+  terragrunt-cache-filepaths-count:
+    description: 'The file paths count of .terragrunt-cache directories'
+  tfstate-mismatch-filepaths:
+    description: 'The file paths list of default.tfstate not existing as terragrunt.hcl in repository'
+  tfstate-mismatch-filepaths-count:
+    description: 'The file paths count of default.tfstate not existing as terragrunt.hcl in repository'
 runs:
   using: 'node16'
   main: 'lib/index.js'

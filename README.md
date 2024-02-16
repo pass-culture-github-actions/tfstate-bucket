@@ -1,42 +1,73 @@
-# Changed ArgoCD app - GitHub Actions
+# tfstate GCP bucket
 
 ## What is it ?
 
-GitHub action to retrieve argocd app edited in a PR.
+GitHub action to perform maintainance task on the tfstate GCP bucket.
+
+**Features**
+
+- Remove empty `default.tfstate` files.
+- Remove unecessary `.terragrunt-cache` directories.
+- Report mismatch between GCS tfstate bucket and IaC repository.
+- Push removal of empty `default.tfstate` or `.terragrunt-cache` or both.
 
 ## Usage
 
 ### Classic usage
 
 ```yml
-on: pull_request
+name: Terragrunt run all plans
+
+on:
+  workflow_dispatch:
+
+env:
+  # NODE_DEBUG env can be used for verbose debugging
+  NODE_DEBUG: execa
 
 jobs:
-  argocd-apps:
+  tfstate:
     runs-on: ubuntu-latest
-    name: An example job that return argocd list of app with changes
+    name: An example job that will clean the tfstate bucket
     steps:
-      - name: Checkout
+      - name: 'Checkout'
         uses: actions/checkout@v4
-      - name: Get changed files
-        id: changed-files
-        uses: tj-actions/changed-files@v42
-      - name: Get argocd app list concerned by changes
-        uses: pass-culture-github-actions/changed-argocd-app@v1.0.0
+      - name: 'Authenticate to Google Cloud'
+        uses: 'google-github-actions/auth@v2'
         with:
-          all_modified_files: ${{ steps.changed-files.outputs.all_modified_files }} # From tj-actions/changed-files
-```
+          workload_identity_provider: ${{ secrets.workload_identity_provider }}
+          service_account: ${{ secrets.service_account }}
+      - name: 'Set up Cloud SDK'
+        uses: 'google-github-actions/setup-gcloud@v2'
+      - uses: 'pass-culture-github-actions/tfstate-bucket@v1.0.0'
+        id: 'tfstate-bucket'
+        with:
+          bucket: 'tfstate-bucket-name'
+          project: 'gcp-project'
+          push: false
+          terragrunt-cache: true
+          tfstate: true
+          terragrunt-directory: 'terragrunt'
+          terragrunt-bucket-directory: 'infrastructure'
+      - run: echo "emptyTfstateFilepaths=${{ steps.tfstate-bucket.outputs.empty-tfstate-filepaths }}"
+      - run: echo "terragruntCacheFilepaths=${{ steps.tfstate-bucket.outputs.terragrunt-cache-filepaths }}"
+      - run: echo "tfstateMismatchFilepaths=${{ steps.tfstate-bucket.outputs.tfstate-mismatch-filepaths }}"
 
+```
 
 ## Inputs
 
 ### Action inputs
 
-| Name | Description | Required | Default |
-| --- | --- | --- | --- |
-| `all_modified_files` | From tj-actions/changed-files: Returns all changed files i.e. a combination of all added, copied, modified and renamed files (ACMR) | ✅ | |
-
-
+| Name                          | Description | Required | Default |
+| ----------------------------- | ----------- | -------- | ------- |
+| `bucket`                      | The name of the bucket to pull | yes  | |
+| `project`                     | The project name that own the bucket | yes |
+| `terragrunt-cache`            | If set to true, it will locally remove empty .terragrunt-cache directory | no | `true` |
+| `tfstate`                     | If set to true, it will locally remove empty tfstate files | no | `true` |
+| `push`                        | If set to true, it will push changes to bucket | no | `false` |
+| `terragrunt-directory`        | Set the terragrunt directory from the checkout repository to start the filepath with to compare. Used when checkout-warning-mismatch: true' | no | |
+| `terragrunt-bucket-directory` | Set the terragrunt bucket directory to start the filepath with to compare. Used when checkout-warning-mismatch: true' | no | |
 
 ## Outputs
 
@@ -44,24 +75,14 @@ jobs:
 
 You can get some outputs from this actions :
 
-| Name   | Description                         |
-| ------ | ----------------------------------- |
-| `apps` | The list of ArgoCD app with changes |
-
-### Example output
-
-```yaml
-- uses: pass-culture-github-actions/changed-argocd-app@v1.0.0
-  id: argocd-apps
-  with:
-    all_modified_files: ${{ steps.changed-files.outputs.all_modified_files }} # From tj-actions/changed-files
-- name: Check apps
-  run: |
-    echo "${{ steps.argocd-apps.outputs.apps }}"
-    # With `steps.argocd-apps.outputs.apps='posthog clickhouse external-dns'`
-    # Outputs : `posthog clickhouse external-dns`
-```
-
+| Name                                | Description                                                                              |
+| ----------------------------------- | ---------------------------------------------------------------------------------------- |
+| `empty-tfstate-filepaths`           | The file paths list of empty `default.tfstate` files                                     |
+| `empty-tfstate-filepaths-count`     | The file paths count of empty `default.tfstate` files                                    |
+| `terragrunt-cache-filepaths`        | The file paths list of `.terragrunt-cache` directories                                   |
+| `terragrunt-cache-filepaths-count`  | The file paths count of `.terragrunt-cache` directories                                  |
+| `tfstate-mismatch-filepaths`        | The file paths list of `default.tfstate` not existing as `terragrunt.hcl` in repository  |
+| `tfstate-mismatch-filepaths-count`  | The file paths count of `default.tfstate` not existing as `terragrunt.hcl` in repository |
 
 ## Contributing
 
