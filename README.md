@@ -8,12 +8,31 @@ GitHub action to perform maintainance task on the tfstate GCP bucket.
 
 - Remove empty `default.tfstate` files.
 - Remove unecessary `.terragrunt-cache` directories.
-- Report mismatch between GCS tfstate bucket and IaC repository.
+- Remove mismatch between GCS tfstate bucket and IaC repository.
+  - Exclude files from open and draft pull requests.
 - Push removal of empty `default.tfstate` or `.terragrunt-cache` or both.
 
 ## Usage
 
 ### Classic usage
+
+You must use the following permissions when using this action:
+
+```yaml
+permissions:
+  pull-requests: 'read'
+  contents: 'read'
+  id-token: 'write'
+```
+
+You also needs to pass the following environment at the step of this action:
+
+```yaml
+env:
+  GH_TOKEN: ${{ github.token }}
+```
+
+Example:
 
 ```yml
 name: Terragrunt run all plans
@@ -29,6 +48,10 @@ jobs:
   tfstate:
     runs-on: ubuntu-latest
     name: An example job that will clean the tfstate bucket
+    permissions:
+      pull-requests: 'read'
+      contents: 'read'
+      id-token: 'write'
     steps:
       - name: 'Checkout'
         uses: actions/checkout@v4
@@ -41,12 +64,15 @@ jobs:
         uses: 'google-github-actions/setup-gcloud@v2'
       - uses: 'pass-culture-github-actions/tfstate-bucket@v1.0.0'
         id: 'tfstate-bucket'
+        env:
+          GH_TOKEN: ${{ github.token }}
         with:
           bucket: 'tfstate-bucket-name'
           project: 'gcp-project'
           push: false
           terragrunt-cache: true
           tfstate: true
+          mismtach: true
           terragrunt-directory: 'terragrunt'
           terragrunt-bucket-directory: 'infrastructure'
       - run: echo "emptyTfstateFilepaths=${{ steps.tfstate-bucket.outputs.empty-tfstate-filepaths }}"
@@ -65,6 +91,8 @@ jobs:
 | `project`                     | The project name that own the bucket | yes |
 | `terragrunt-cache`            | If set to true, it will locally remove empty .terragrunt-cache directory | no | `true` |
 | `tfstate`                     | If set to true, it will locally remove empty tfstate files | no | `true` |
+| `mismatch`                    | If set to true, it will locally remove tfstate not on repository | no | `false` |
+| `mismatch-base-ref`           | Change the mismatch base-ref to search for pull request | no | `main` |
 | `push`                        | If set to true, it will push changes to bucket | no | `false` |
 | `terragrunt-directory`        | Set the terragrunt directory from the checkout repository to start the filepath with to compare. Used when checkout-warning-mismatch: true' | no | |
 | `terragrunt-bucket-directory` | Set the terragrunt bucket directory to start the filepath with to compare. Used when checkout-warning-mismatch: true' | no | |
@@ -75,14 +103,16 @@ jobs:
 
 You can get some outputs from this actions :
 
-| Name                                | Description                                                                              |
-| ----------------------------------- | ---------------------------------------------------------------------------------------- |
-| `empty-tfstate-filepaths`           | The file paths list of empty `default.tfstate` files                                     |
-| `empty-tfstate-filepaths-count`     | The file paths count of empty `default.tfstate` files                                    |
-| `terragrunt-cache-filepaths`        | The file paths list of `.terragrunt-cache` directories                                   |
-| `terragrunt-cache-filepaths-count`  | The file paths count of `.terragrunt-cache` directories                                  |
-| `tfstate-mismatch-filepaths`        | The file paths list of `default.tfstate` not existing as `terragrunt.hcl` in repository  |
-| `tfstate-mismatch-filepaths-count`  | The file paths count of `default.tfstate` not existing as `terragrunt.hcl` in repository |
+| Name                                       | Description                                                                              |
+| ------------------------------------------ | ---------------------------------------------------------------------------------------- |
+| `empty-tfstate-filepaths`                  | The file paths list of empty `default.tfstate` files                                     |
+| `empty-tfstate-filepaths-count`            | The file paths count of empty `default.tfstate` files                                    |
+| `terragrunt-cache-filepaths`               | The file paths list of `.terragrunt-cache` directories                                   |
+| `terragrunt-cache-filepaths-count`         | The file paths count of `.terragrunt-cache` directories                                  |
+| `tfstate-mismatch-filepaths`               | The file paths list of `default.tfstate` not existing as `terragrunt.hcl` in repository  |
+| `tfstate-mismatch-filepaths-count`         | The file paths count of `default.tfstate` not existing as `terragrunt.hcl` in repository |
+| `tfstate-mismatch-filepaths-from-pr`       | The file paths list of `terragrunt.hcl` currently being edited in a pull request         |
+| `tfstate-mismatch-filepaths-from-pr-count` | The file paths count of `terragrunt.hcl` currenclty being edited in a pull request       |
 
 ## Contributing
 
