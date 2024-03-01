@@ -13,6 +13,12 @@ inputs:
   tfstate:
     description: 'If set to true, it will locally remove empty tfstate files'
     default: true
+  mismatch:
+    description: 'If set to true, it will locally remove tfstate not on repository nor open or draft pull requests'
+    default: false
+  mismatch-base-ref:
+    description: 'Change the mismatch base-ref to search for pull request'
+    default: 'main'
   push:
     description: 'If set to true, it will push changes to bucket'
     default: false
@@ -35,6 +41,10 @@ outputs:
     description: 'The file paths list of default.tfstate not existing as terragrunt.hcl in repository'
   tfstate-mismatch-filepaths-count:
     description: 'The file paths count of default.tfstate not existing as terragrunt.hcl in repository'
+  tfstate-mismatch-filepaths-from-pr:
+    description: 'The file paths list of terragrunt.hcl currently being edited in a pull request'
+  tfstate-mismatch-filepaths-from-pr-count:
+    description: 'The file paths count of terragrunt.hcl currenclty being edited in a pull request'
 runs:
   using: 'node16'
   main: 'lib/index.js'
