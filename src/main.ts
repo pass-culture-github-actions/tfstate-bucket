@@ -272,23 +272,29 @@ async function run() {
     return;
   }
 
+
+  if (tfstate) {
+    emptyTfStatFilePaths.forEach(fs.unlinkSync);
+  }
+  if (terragruntCache) {
+    terragruntCacheFilePaths.forEach((folder: string) => {
+      if (fs.existsSync(folder)) {
+        fs.rm(folder, RM_OPTIONS, RM_CALLBACK);
+      }
+    });
+  }
+  if (mismatch) {
+    mismatchFilePaths.forEach((filePath) => {
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath)
+      }
+    });
+  }
+
+  console.log(`${push ? '' : '[DRYRUN] '}Pushing tfstate bucket gs://${bucket}...`);
+
   if (push) {
     try {
-      console.log(`Pushing tfstate bucket gs://${bucket}...`);
-      if (tfstate) {
-        emptyTfStatFilePaths.forEach(fs.unlinkSync);
-      }
-      if (terragruntCache) {
-        terragruntCacheFilePaths.forEach((folder: string) => {
-          if (fs.existsSync(folder)) {
-            fs.rm(folder, RM_OPTIONS, RM_CALLBACK);
-          }
-        });
-      }
-      if (mismatch) {
-        mismatchFilePaths.forEach(fs.unlinkSync);
-      }
-
       await execa('gcloud', [
         'storage',
         'rsync',
@@ -322,7 +328,26 @@ async function run() {
       return;
     }
   } else {
-    console.log('No change will be written to bucket. Use input.push: true to apply');
+    try {
+      await execa('gcloud', [
+        'storage',
+        'rsync',
+        '--dry-run',
+        '--recursive',
+        '--delete-unmatched-destination-objects',
+        '--project',
+        project,
+        TMP_DIR,
+        `gs://${bucket}`
+      ]);
+
+      console.log('No change will be written to bucket. Use input.push: true to apply');
+    } catch (err) {
+      if (err instanceof Error) {
+        core.setFailed(err.message);
+      }
+      return;
+    }
   }
 
   try {
