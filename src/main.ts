@@ -295,7 +295,7 @@ async function run() {
 
   if (push) {
     try {
-      await execa('gcloud', [
+      const { stdout } = await execa('gcloud', [
         'storage',
         'rsync',
         '--recursive',
@@ -305,6 +305,7 @@ async function run() {
         TMP_DIR,
         `gs://${bucket}`
       ]);
+      console.log(stdout)
 
       if (tfstate) {
         getEmptyTfStateFilePaths(); // refresh output count
@@ -329,7 +330,7 @@ async function run() {
     }
   } else {
     try {
-      await execa('gcloud', [
+      const { stdout: stdoutdry } = await execa('gcloud', [
         'storage',
         'rsync',
         '--dry-run',
@@ -340,7 +341,7 @@ async function run() {
         TMP_DIR,
         `gs://${bucket}`
       ]);
-
+      console.log(stdoutdry)
       console.log('No change will be written to bucket. Use input.push: true to apply');
     } catch (err) {
       if (err instanceof Error) {
